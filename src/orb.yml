@@ -1,8 +1,8 @@
 version: 2.1
 
 description: >
-  This orb is a wrapper for the Twistlock twistcli scanning tool. 
-  Twistcli is a static Linux binary. 
+  This orb is a wrapper for the Twistlock twistcli scanning tool.
+  Twistcli is a static Linux binary.
   To use this orb, you must have a licensed Twistlock installation and credentials for a user with the CI User role in the Twistlock Console.
 
 executors:
