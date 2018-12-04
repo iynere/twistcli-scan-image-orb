@@ -1,0 +1,103 @@
+version: 2.1
+
+description: |
+  This orb is a wrapper for the Twistlock twistcli scanning tool. Twistcli is a static Linux binary. To use this orb, you must have a licensed Twistlock installation and credentials for a user with the CI User role in the Twistlock Console.
+
+executors:
+  default:
+    machine: true
+
+commands:
+  install:
+    description: Download the twistcli static binary from the Console
+    parameters:
+      tl_user:
+        description: The Twistlock Console user with the CI User role
+        type: string
+        default: $TL_USER
+      tl_pass:
+        description: The Twistlock Console user's password
+        type: string
+        default: $TL_PASS
+      tl_console_url:
+        description: The base URL for the console -- http://console.<my_company>.com:8083 -- without a trailing /
+        type: string
+        default: $TL_CONSOLE_URL
+    steps:
+      - run: curl -k -u <<parameters.tl_user>>:<<parameters.tl_pass>> --output ./twistcli <<parameters.tl_console_url>>/api/v1/util/twistcli
+      - run: sudo chmod a+x ./twistcli 
+
+  build-and-scan:
+    description: Build the container image and scan it with twistcli
+    parameters:
+      tl_user:
+        description: The Twistlock Console user with the CI User role
+        type: string
+        default: $TL_USER
+      tl_pass:
+        description: The Twistlock Console user's password
+        type: string
+        default: $TL_PASS
+      tl_console_url:
+        description: The base URL for the console -- http://console.<my_company>.com:8083 -- without a trailing /
+        type: string
+        default: $TL_CONSOLE_URL
+      tl_image:
+        description: The image to scan
+        type: string
+        default: $TL_IMAGE
+      tl_dockerfile:
+        description: The path to the Dockerfile
+        type: string
+        default: .
+    steps:
+      # Run the built-in checkout script to checkout the code in this repo
+      - checkout
+      # Build our project that is contained in the code
+      # checked out above.
+      - run: docker build -t <<parameters.tl_image>>:$CIRCLE_BRANCH <<parameters.tl_dockerfile>>
+      # Run the scan with twistcli, providing detailed results in CircleCI and
+      # pushing the results to the Twistlock console.
+      # --details returns all vulnerabilities & compliance issues rather than just summaries.
+      # --address points to our Twistlock console
+      # -u and -p provide credentials for the console.  These creds only need the CI User role.
+      # Finally, we provide the name of the image we built with 'docker build', above.
+      - run: ./twistcli images scan --details -address <<parameters.tl_console_url>> -u <<parameters.tl_user>> -p <<parameters.tl_pass>> <<parameters.tl_image>>:$CIRCLE_BRANCH
+      # Add --vulnerability-threshold and/or --compliance-threshold to this command to
+      # fail builds based on the thresholds.
+
+jobs:
+  scan-image:
+    executor: default
+    parameters:
+      tl_user:
+        description: The Twistlock Console user with the CI User role
+        type: string
+        default: $TL_USER
+      tl_pass:
+        description: The Twistlock Console user's password
+        type: string
+        default: $TL_PASS
+      tl_console_url:
+        description: The base URL for the console -- http://console.<my_company>.com:8083 -- without a trailing /
+        type: string
+        default: $TL_CONSOLE_URL
+      tl_image:
+        description: The name of the image to scan -- myimage or myorg/myimage
+        type: string
+        default: $TL_IMAGE
+      tl_dockerfile:
+        description: The path to the Dockerfile -- defaults to .
+        type: string
+        default: .
+    steps:
+      - install: 
+          tl_user: <<parameters.tl_user>>
+          tl_pass: <<parameters.tl_pass>>
+          tl_console_url: <<parameters.tl_console_url>>
+      - build-and-scan:
+          tl_user: <<parameters.tl_user>>
+          tl_pass: <<parameters.tl_pass>>
+          tl_console_url: <<parameters.tl_console_url>>
+          tl_image: <<parameters.tl_image>>
+          tl_dockerfile: <<parameters.tl_dockerfile>>
